@@ -4,44 +4,41 @@ var angular = require('angular');
 var traefikCoreProvider = 'traefik.core.provider';
 module.exports = traefikCoreProvider;
 
-angular
-  .module(traefikCoreProvider, ['ngResource'])
-  .factory('Providers', Providers);
+angular.module(traefikCoreProvider, ['ngResource']).factory('Providers', Providers);
 
 /** @ngInject */
-function Providers($resource) {
+function Providers($resource, $q) {
   const resourceProvider = $resource('../api/providers');
   return {
-    get: function () {
-      const rawProviders = resourceProvider.get();
+    get: function() {
+      return $q((resolve, reject) => {
+        resourceProvider.get().$promise.then((rawProviders) => {
+          for (let providerName in rawProviders) {
+            if (rawProviders.hasOwnProperty(providerName)) {
+              if (rawProviders[providerName].backends) {
+                // BackEnds mapping
+                let bckends = rawProviders[providerName].backends;
 
-      for (let providerName in rawProviders) {
-        if (rawProviders.hasOwnProperty(providerName)) {
+                rawProviders[providerName].backends = Object.keys(bckends).map(key => {
+                  const goodBackend = bckends[key];
+                  goodBackend.backendId = key;
+                  return goodBackend;
+                });
 
-          // BackEnds mapping
-          let bckends = rawProviders[providerName].backends;
+                // FrontEnds mapping
+                let frtends = rawProviders[providerName].frontends;
 
-          rawProviders[providerName].backends = Object.keys(bckends)
-            .map(key => {
-              const goodBackend = bckends[key];
-              goodBackend.backendId = key;
-              return goodBackend;
-            });
-
-          // FrontEnds mapping
-          let frtends = rawProviders[providerName].frontends;
-
-          rawProviders[providerName].frontends = Object.keys(frtends)
-            .map(key => {
-              const goodFrontend = frtends[key];
-              goodFrontend.frontendId = key;
-              return goodFrontend;
-            });
-
-        }
-      }
-
-      return rawProviders;
+                rawProviders[providerName].frontends = Object.keys(frtends).map(key => {
+                  const goodFrontend = frtends[key];
+                  goodFrontend.frontendId = key;
+                  return goodFrontend;
+                });
+              }
+            }
+          }
+          resolve(rawProviders);
+        }).catch(reject);
+      });
     }
   };
 }
